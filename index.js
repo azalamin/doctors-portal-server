@@ -2,11 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const sgTransport = require("nodemailer-sendgrid-transport");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 const app = express();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // use middleware
 app.use(cors());
@@ -95,6 +96,17 @@ async function run() {
       }
     };
 
+    app.post("/create-payment-intent", verifyJWT,  async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({ clientSecret: paymentIntent.client_secret });
+    });
+
     app.get("/service", async (req, res) => {
       const query = {};
       const cursor = serviceCollection.find(query).project({ name: 1 });
@@ -174,6 +186,13 @@ async function run() {
       });
 
       res.send(services);
+    });
+
+    app.get("/booking/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const booking = await bookingCollection.findOne(query);
+      res.send(booking);
     });
 
     app.get("/booking", verifyJWT, async (req, res) => {
