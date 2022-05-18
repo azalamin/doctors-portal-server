@@ -82,6 +82,7 @@ async function run() {
       .collection("bookings");
     const userCollection = client.db("doctors_portal").collection("user");
     const doctorCollection = client.db("doctors_portal").collection("doctors");
+    const paymentCollection = client.db("doctors_portal").collection("payment");
     console.log("db connected");
 
     const verifyAdmin = async (req, res, next) => {
@@ -96,7 +97,7 @@ async function run() {
       }
     };
 
-    app.post("/create-payment-intent", verifyJWT,  async (req, res) => {
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
       const amount = price * 100;
       const paymentIntent = await stripe.paymentIntents.create({
@@ -193,6 +194,24 @@ async function run() {
       const query = { _id: ObjectId(id) };
       const booking = await bookingCollection.findOne(query);
       res.send(booking);
+    });
+
+    app.patch("/booking/:id", async (req, res) => {
+      const id = req.params.id;
+      const payment = req.body;
+      const query = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.transactionId,
+        },
+      };
+      const result = await paymentCollection.insertOne(payment);
+      const updatedBooking = await bookingCollection.updateOne(
+        query,
+        updatedDoc
+      );
+      res.send(updatedBooking);
     });
 
     app.get("/booking", verifyJWT, async (req, res) => {
